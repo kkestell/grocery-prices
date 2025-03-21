@@ -115,9 +115,36 @@ def show_comparison(comparison_id):
         unit=comparison["products"][0]["unit"] if comparison["products"] else None
     )
 
-@app.route("/comparisons/new")
+
+@app.route("/comparisons/new", methods=["GET", "POST"])
 def new_comparison():
-    return render_template("comparisons/new.html", categories=sorted(CATEGORIES))
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+
+        if not title:
+            return render_template("comparisons/new.html", error="Title cannot be empty"), 400
+
+        try:
+            # Create an empty comparison with just a title
+            comparison_id = db.create_comparison(title, [])
+
+            # Redirect to edit page for the new comparison
+            return redirect(url_for("edit_comparison", comparison_id=comparison_id))
+        except Exception as e:
+            return render_template("comparisons/new.html", error=str(e)), 500
+
+    return render_template("comparisons/new.html")
+
+
+@app.route("/comparisons/<int:comparison_id>/edit")
+def edit_comparison(comparison_id):
+    comparison = db.get_comparison(comparison_id)
+    if not comparison:
+        return "Comparison not found", 404
+
+    return render_template("comparisons/edit.html",
+                           comparison=comparison,
+                           categories=sorted(CATEGORIES))
 
 
 @app.route("/compare")
@@ -232,9 +259,6 @@ def create_comparison():
 
     if not title.strip():
         return jsonify({"error": "Title cannot be empty"}), 400
-
-    if not product_ids or not isinstance(product_ids, list) or len(product_ids) == 0:
-        return jsonify({"error": "At least one product is required"}), 400
 
     try:
         comparison_id = db.create_comparison(title, product_ids)

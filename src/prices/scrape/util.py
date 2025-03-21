@@ -164,7 +164,8 @@ def split_price(price: str) -> float:
 mapping = {
     "Baby & Child": [
         "Baby",
-        "Baby Items"
+        "Baby Items",
+        "Baby & Kids"
     ],
 
     "Bakery & Bread": [
@@ -175,7 +176,14 @@ mapping = {
         "Loaves, Rolls, Buns",
         "Sliced Bread",
         "Bagels",
-        "Sweet Stuff"
+        "Sweet Stuff",
+        "Bakery Desserts",
+        "Breakfast Bakery",
+        "Buns & Rolls",
+        "Bakery & Bread",
+        "Tortillas & Flat Bread",
+        "Bread",
+        "Breads & Doughs"
     ],
 
     "Beverages": [
@@ -193,7 +201,8 @@ mapping = {
         "Coffee & Tea",
         "Juices & More",
         "Sodas & Mixers",
-        "Non-Dairy Bev"
+        "Non-Dairy Bev",
+        "Fresh Juice"
     ],
 
     "Dairy & Eggs": [
@@ -235,7 +244,10 @@ mapping = {
         "Appetizers",
         "Cool Desserts",
         "Fruit & Vegetables",
-        "Entrées & Sides"
+        "Entrées & Sides",
+        "Frozen Pizza & Meals",
+        "Appetizers & Sides",
+        "Dessert, Ice Cream & Ice"
     ],
 
     "Meat & Seafood": [
@@ -244,7 +256,16 @@ mapping = {
         "Chicken & Turkey",
         "Fish & Seafood",
         "Beef, Pork & Lamb",
-        "Plant-based Protein"
+        "Plant-based Protein",
+        "Hot Dogs, Bacon & Sausage",
+        "Packaged Poultry",
+        "Seafood",
+        "All Natural Poultry",
+        "Packaged Meat",
+        "All Natural Pork",
+        "All Natural Meat",
+        "Packaged Seafood",
+        "Vegan & Vegetarian"
     ],
 
     "Pantry & Dry Goods": [
@@ -269,7 +290,9 @@ mapping = {
         "Pastas & Grains",
         "Honeys, Syrups & Nectars",
         "Cereals",
-        "Packaged Fish, Meat, Fruit & Veg"
+        "Packaged Fish, Meat, Fruit & Veg",
+        "Packaged Vegetables & Fruits",
+        "Breakfast"
     ],
 
     "Produce": [
@@ -277,7 +300,10 @@ mapping = {
         "Fresh Produce",
         "Fruits & Vegetables",
         "Fruits",
-        "Veggies"
+        "Veggies",
+        "Fresh Vegetables",
+        "Fresh Herbs",
+        "Fresh Fruits"
     ],
 
     "Snacks & Desserts": [
@@ -307,7 +333,35 @@ mapping = {
         "Clothing",
         "Reading",
         "For the Face & Body",
-        "Nutritional Supplements"
+        "Nutritional Supplements",
+        "Fish Oils",
+        "Digestive Aids",
+        "Mood & Sleep",
+        "Seasonal Wellness & Immune",
+        "Homeopathy",
+        "Children's Vitamins",
+        "Weight Loss & Diet",
+        "Children's Health",
+        "Children's Supplements",
+        "Single Vitamins",
+        "Cleanse & Detox",
+        "Women's & Men's Health",
+        "Amino Acids",
+        "Minerals",
+        "Sports Nutrition",
+        "Antioxidants",
+        "Herbs",
+        "CBD",
+        "Protein Powders & Shakes",
+        "Calcium & Joint Health",
+        "Plant Oils",
+        "Superfoods & Greens",
+        "Probiotics",
+        "Heart Health",
+        "Collagen",
+        "OTC Internal",
+        "Multivitamins",
+        "Enzymes"
     ],
 
     "Seasonal & Special": [
@@ -341,7 +395,8 @@ mapping = {
     ],
 
     "Miscellaneous": [
-        "Unknown"
+        "Unknown",
+        "Products"
     ]
 }
 

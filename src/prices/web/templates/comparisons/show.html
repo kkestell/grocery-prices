@@ -41,6 +41,9 @@
                 <input type="hidden" name="_method" value="DELETE">
                 <button type="submit">Delete Comparison</button>
             </form>
+            <p>
+                <a href="/comparisons/{{ comparison['id'] }}/edit">Edit Comparison</a>
+            </p>
         </header>
 
         {% set unit = comparison["products"][0]["unit"] %}
@@ -196,92 +199,92 @@
                         borderColors.push(color === 'rgba(75, 192, 92, 0.6)' ? 'rgba(75, 192, 92, 1)' : 'rgba(54, 162, 235, 1)');
                     }
 
-new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: labels,
-        datasets: [{
-            label: 'Price ($)',
-            data: prices,
-            backgroundColor: backgroundColors,
-            borderColor: borderColors,
-            borderWidth: 1,
-            barPercentage: 0.5,
-            categoryPercentage: 0.8
-        }]
-    },
-    options: {
-        animation: false,
-        indexAxis: 'y',
-        color: 'black',
-        font: {
-            family: 'system-ui, sans-serif',
-            color: 'black'
-        },
-        scales: {
-            y: {
-                beginAtZero: false,
-                ticks: {
-                    display: true,
-                    font: {
-                        size: 14,
-                        family: 'system-ui, sans-serif',
-                        color: 'black'
-                    },
-                    callback: function(value, index) {
-                        return labels[index];
-                    },
-                    color: 'black'
-                },
-                grid: {
-                    display: false
-                },
-                title: {
-                    color: 'black'
-                }
-            },
-            x: {
-                title: {
-                    display: true,
-                    text: 'Price {% if comparison["products"]|length > 0 and comparison["products"][0].get("unit_price") %}per {{ unit }}{% endif %} ($)',
-                    color: 'black'
-                },
-                ticks: {
-                    callback: function(value) {
-                        return '$' + value.toFixed(2);
-                    },
-                    color: 'black'
-                },
-                grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                }
-            }
-        },
-        plugins: {
-            legend: {
-                display: false,
-                labels: {
-                    color: 'black'
-                }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                titleColor: 'white',
-                bodyColor: 'white',
-                callbacks: {
-                    label: function(context) {
-                        return '$' + context.raw.toFixed(2) + '{% if comparison["products"]|length > 0 and comparison["products"][0].get("unit_price") %} per {{ unit }}{% endif %}';
-                    }
-                }
-            },
-            title: {
-                color: 'black'
-            }
-        },
-        responsive: true,
-        maintainAspectRatio: false
-    }
-});
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Price ($)',
+                                data: prices,
+                                backgroundColor: backgroundColors,
+                                borderColor: borderColors,
+                                borderWidth: 1,
+                                barPercentage: 0.5,
+                                categoryPercentage: 0.8
+                            }]
+                        },
+                        options: {
+                            animation: false,
+                            indexAxis: 'y',
+                            color: 'black',
+                            font: {
+                                family: 'system-ui, sans-serif',
+                                color: 'black'
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: {
+                                        display: true,
+                                        font: {
+                                            size: 14,
+                                            family: 'system-ui, sans-serif',
+                                            color: 'black'
+                                        },
+                                        callback: function(value, index) {
+                                            return labels[index];
+                                        },
+                                        color: 'black'
+                                    },
+                                    grid: {
+                                        display: false
+                                    },
+                                    title: {
+                                        color: 'black'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Price {% if comparison["products"]|length > 0 and comparison["products"][0].get("unit_price") %}per {{ unit }}{% endif %} ($)',
+                                        color: 'black'
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '$' + value.toFixed(2);
+                                        },
+                                        color: 'black'
+                                    },
+                                    grid: {
+                                        color: 'rgba(0, 0, 0, 0.1)'
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false,
+                                    labels: {
+                                        color: 'black'
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                    titleColor: 'white',
+                                    bodyColor: 'white',
+                                    callbacks: {
+                                        label: function(context) {
+                                            return '$' + context.raw.toFixed(2) + '{% if comparison["products"]|length > 0 and comparison["products"][0].get("unit_price") %} per {{ unit }}{% endif %}';
+                                        }
+                                    }
+                                },
+                                title: {
+                                    color: 'black'
+                                }
+                            },
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
                 {% endif %}
             });
         </script>
