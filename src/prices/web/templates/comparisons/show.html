@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}{{ comparison["title"] }}{% endblock %}
+
+{% block head %}
+<style>
+    th, td {
+        white-space: nowrap;
+        width: 1px;
+    }
+
+    .col-product-name {
+        width: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+
+    .best-value {
+        background-color: #f0fff0 !important;
+    }
+
+    .unit-price {
+        font-size: 0.9em;
+        color: #444;
+    }
+
+    .chart-container {
+        width: 100%;
+    }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+{% endblock %}
+
+{% block content %}
+    <main>
+        <header>
+            <h1>{{ comparison["title"] }}</h1>
+            <form action="/api/comparisons/{{ comparison['id'] }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this comparison?');">
+                <input type="hidden" name="_method" value="DELETE">
+                <button type="submit">Delete Comparison</button>
+            </form>
+        </header>
+
+        {% set unit = comparison["products"][0]["unit"] %}
+
+        <p>
+            Best value (price per {{ unit }}):
+            {% if best_value_product %}
+                <strong>{{ best_value_product["brand"] }} {{ best_value_product["name"] }}</strong> at {{ best_value_product["store"] }} -
+                ${{ "%.2f"|format(best_value_product["lowest_price"]) }}
+                ({{ best_value_product["size"] }} {{ unit }})
+                <span class="unit-price">${{ "%.2f"|format(best_value_product["unit_price"]) }} per {{ unit }}</span>
+            {% else %}
+                Unable to determine
+            {% endif %}
+        </p>
+
+        <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+
+        <table border>
+            <thead>
+                <tr>
+                    <th class="col-store">Store</th>
+                    <th class="col-brand">Brand</th>
+                    <th class="col-product-name">Product Name</th>
+                    <th class="col-size">Size</th>
+                    <th class="col-unit">Unit</th>
+                    <th class="col-price">Price</th>
+                    <th class="col-unit-price">Price/{{ unit }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in comparison["products"] %}
+                    <tr
+                        {% if best_value_product and product["id"] == best_value_product["id"] %}
+                            class="best-value"
+                        {% endif %}
+                    >
+                        <td class="col-store">{{ product["store"] }}</td>
+                        <td class="col-brand">{{ product["brand"] }}</td>
+                        <td class="col-product-name">
+                            <a href="/price-history/{{ product['store'] }}/{{ product['sku'] }}">{{ product["name"] }}</a>
+                        </td>
+                        <td class="col-size">{{ product["size"] }}</td>
+                        <td class="col-unit">{{ product["unit"] }}</td>
+                        <td class="col-price">
+                            {% if product["lowest_price"] == product["highest_price"] %}
+                                ${{ "%.2f"|format(product["lowest_price"]) }}
+                            {% else %}
+                                ${{ "%.2f"|format(product["lowest_price"]) }} - ${{ "%.2f"|format(product["highest_price"]) }}
+                            {% endif %}
+                        </td>
+                        <td class="col-unit-price">
+                            {% if product.get("unit_price") %}
+                                ${{ "%.2f"|format(product["unit_price"]) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <script>
+            // Handle the DELETE request for the form
+            document.addEventListener('DOMContentLoaded', function() {
+                const deleteForm = document.querySelector('form');
+                deleteForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    if (confirm('Are you sure you want to delete this comparison?')) {
+                        fetch('/api/comparisons/{{ comparison["id"] }}', {
+                            method: 'DELETE'
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                window.location.href = '/comparisons';
+                            } else {
+                                alert('Failed to delete the comparison');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while deleting the comparison');
+                        });
+                    }
+                });
+
+                {% if comparison["products"]|length > 0 %}
+                    // Create the price comparison chart
+                    const ctx = document.getElementById('priceChart').getContext('2d');
+
+                    // Extract the product data from the comparison object
+                    const productData = [];
+                    {% for product in comparison["products"] %}
+                    productData.push({
+                        name: "{{ product['name'] }}",
+                        brand: "{{ product['brand'] }}",
+                        store: "{{ product['store'] }}",
+                        price: {{ product['lowest_price'] }},
+                        unit_price: {{ product.get('unit_price', 0) or 0 }}
+                    });
+                    {% endfor %}
+
+                    // Sort products by unit price if available, otherwise by price
+                    productData.sort((a, b) => {
+                        if (a.unit_price && b.unit_price) {
+                            return a.unit_price - b.unit_price;
+                        }
+                        return a.price - b.price;
+                    });
+
+                    // Create labels with brand, name and store - increased length limit to 45 characters
+                    const labels = [];
+                    for (const product of productData) {
+                        const displayName = product.name.length > 45
+                            ? product.name.substring(0, 45) + '...'
+                            : product.name;
+                        labels.push(`${product.brand} - ${displayName} (${product.store})`);
+                    }
+
+                    // Get prices for the chart data - use unit price if available
+                    const prices = [];
+                    for (const product of productData) {
+                        prices.push(product.unit_price > 0 ? product.unit_price : product.price);
+                    }
+
+                    // Set up bar colors - highlight the best value in green
+                    const backgroundColors = [];
+                    const hasBestValue = {% if best_value_product %}true{% else %}false{% endif %};
+
+                    for (let i = 0; i < productData.length; i++) {
+                        let isMatch = false;
+                        {% if best_value_product %}
+                        if (productData[i].name === "{{ best_value_product['name'] }}" &&
+                            productData[i].brand === "{{ best_value_product['brand'] }}" &&
+                            productData[i].store === "{{ best_value_product['store'] }}") {
+                            isMatch = true;
+                        }
+                        {% endif %}
+
+                        backgroundColors.push(
+                            hasBestValue && isMatch ? 'rgba(75, 192, 92, 0.6)' :
+                            (!hasBestValue && i === 0) ? 'rgba(75, 192, 92, 0.6)' :
+                            'rgba(54, 162, 235, 0.6)'
+                        );
+                    }
+
+                    const borderColors = [];
+                    for (const color of backgroundColors) {
+                        borderColors.push(color === 'rgba(75, 192, 92, 0.6)' ? 'rgba(75, 192, 92, 1)' : 'rgba(54, 162, 235, 1)');
+                    }
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Price ($)',
+            data: prices,
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
+            borderWidth: 1,
+            barPercentage: 0.5,
+            categoryPercentage: 0.8
+        }]
+    },
+    options: {
+        animation: false,
+        indexAxis: 'y',
+        color: 'black',
+        font: {
+            family: 'system-ui, sans-serif',
+            color: 'black'
+        },
+        scales: {
+            y: {
+                beginAtZero: false,
+                ticks: {
+                    display: true,
+                    font: {
+                        size: 14,
+                        family: 'system-ui, sans-serif',
+                        color: 'black'
+                    },
+                    callback: function(value, index) {
+                        return labels[index];
+                    },
+                    color: 'black'
+                },
+                grid: {
+                    display: false
+                },
+                title: {
+                    color: 'black'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Price {% if comparison["products"]|length > 0 and comparison["products"][0].get("unit_price") %}per {{ unit }}{% endif %} ($)',
+                    color: 'black'
+                },
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toFixed(2);
+                    },
+                    color: 'black'
+                },
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false,
+                labels: {
+                    color: 'black'
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                titleColor: 'white',
+                bodyColor: 'white',
+                callbacks: {
+                    label: function(context) {
+                        return '$' + context.raw.toFixed(2) + '{% if comparison["products"]|length > 0 and comparison["products"][0].get("unit_price") %} per {{ unit }}{% endif %}';
+                    }
+                }
+            },
+            title: {
+                color: 'black'
+            }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+    }
+});
+                {% endif %}
+            });
+        </script>
+    </main>
+{% endblock %}

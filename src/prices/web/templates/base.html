@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title_full %}{% block title %}{% endblock %}{% if self.title()|trim %} - {% endif %}Prices{%endblock %}</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            font-size: 16px;
+            margin: 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            table-layout: auto;
+            border-color: #666;
+        }
+
+        table.wide {
+            width: 100%;
+        }
+
+        th, td {
+            padding: 0.3rem 0.4rem;
+        }
+
+        th {
+            background-color: #ddd;
+            text-align: left;
+        }
+
+        tr:nth-child(odd) {
+            background-color: #f5f5f5;
+        }
+
+
+        body > header {
+            padding: 1rem;
+        }
+
+        body > header h1 {
+            font-size: 1.25rem;
+        }
+
+        body > header h1 i {
+            display: inline-block;
+            width: 1rem;
+            margin-left: 0.5rem;
+            font-style: normal;
+        }
+
+        main {
+            background-color: #fff;
+            padding: 1rem;
+        }
+
+        main header {
+            margin-bottom: 2rem;
+        }
+
+        main header h1 {
+            margin-top: 0;
+        }
+
+        nav ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        nav ul li {
+            display: inline;
+            margin-right: 1rem;
+        }
+
+        dl {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0.5rem;
+            width: max-content;
+        }
+
+        dl dt {
+            font-weight: bold;
+        }
+
+        dl dd {
+            margin-left: 0;
+        }
+
+        a, a:visited {
+            color: #003388;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <h1>Grocery Prices <i>🍉</i></h1>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/products">Products</a></li>
+                <li><a href="/comparisons">Compare Prices</a></li>
+                <li><a href="/bargains">Bargains</a></li>
+            </ul>
+        </nav>
+    </header>
+    {% block content %}{% endblock %}
+</body>
+</html>

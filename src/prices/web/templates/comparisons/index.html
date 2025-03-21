@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Comparisons{% endblock %}
+
+{% block content %}
+<main>
+    <header>
+        <h1>Comparisons</h1>
+        <p>
+            <a href="/comparisons/new">New Comparison</a>
+        </p>
+    </header>
+
+    <table border>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Cheapest Store</th>
+                <th>Lowest Price</th>
+                <th>Savings</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for comparison in comparisons %}
+            <tr>
+                <td>
+                    <a href="/comparisons/{{ comparison.id }}">{{ comparison.title }}</a>
+                </td>
+                <td>
+                    {% if comparison.best_value_product %}
+                        {{ comparison.best_value_product.store }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if comparison.best_value_product %}
+                        ${{ "%.2f" | format(comparison.best_value_product.unit_price) }}/{{ comparison.unit }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if comparison.savings %}
+                        ${{ "%.2f" | format(comparison.savings) }}/{{ comparison.unit }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</main>
+{% endblock %}

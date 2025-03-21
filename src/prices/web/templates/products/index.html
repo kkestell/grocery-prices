@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Products{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
+<style>
+    .col-compact {
+        white-space: nowrap;
+        width: 1px;
+    }
+    .col-product-name {
+        width: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+    .col-center {
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <main>
+        <header>
+            <h1>Products</h1>
+        </header>
+        <div x-data="priceTracker" x-init="fetchProducts()">
+            <p>
+                <input type="text" x-model="query" placeholder="Search by SKU, product name, or brand" @keyup.enter="searchProducts">
+                <label for="store-filter">Store:</label>
+                <select id="store-filter" x-model="storeFilter" @change="searchProducts">
+                    <option value="">Any</option>
+                    <template x-for="store in storeList">
+                        <option :value="store" x-text="store"></option>
+                    </template>
+                </select>
+                <label for="category-filter">Category:</label>
+                <select id="category-filter" x-model="categoryFilter" @change="searchProducts">
+                    <option value="">Any</option>
+                    <template x-for="category in categories">
+                        <option :value="category" x-text="category"></option>
+                    </template>
+                </select>
+                <label for="snap-filter">SNAP Eligible:</label>
+                <select id="snap-filter" x-model="snapFilter" @change="searchProducts">
+                    <option value="">Any</option>
+                    <option value="1">Yes</option>
+                    <option value="0">No</option>
+                </select>
+                <button @click="searchProducts">Search</button>
+            </p>
+
+            <table border class="wide">
+                <thead>
+                    <tr>
+                        <th class="col-compact">Store</th>
+                        <th class="col-compact">Category</th>
+                        <th class="col-compact">SKU</th>
+                        <th class="col-compact">Brand</th>
+                        <th class="col-product-name">Product Name</th>
+                        <th class="col-compact">Size</th>
+                        <th class="col-compact">Unit</th>
+                        <th class="col-compact">Price</th>
+                        <th class="col-compact col-center">SNAP</th>
+                        <th class="col-compact col-center">Available</th>
+                        <th class="col-compact">Last Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading && products.length === 0">
+                        <tr>
+                            <td colspan="11">Loading...</td>
+                        </tr>
+                    </template>
+
+                    <template x-if="!loading && products.length === 0">
+                        <tr>
+                            <td colspan="11">No results found</td>
+                        </tr>
+                    </template>
+
+                    <template x-for="product in products" :key="product.store + product.sku">
+                        <tr>
+                            <td class="col-compact" x-text="product.store"></td>
+                            <td class="col-compact" x-text="product.category"></td>
+                            <td class="col-compact">
+                                <a :href="`/price-history/${product.store}/${product.sku}`" x-text="product.sku"></a>
+                            </td>
+                            <td class="col-compact" x-text="product.brand || ''"></td>
+                            <td class="col-product-name" x-text="product.name"></td>
+                            <td class="col-compact" x-text="product.size || ''"></td>
+                            <td class="col-compact" x-text="product.unit || ''"></td>
+                            <td class="col-compact" x-text="formatPrice(product.lowest_price, product.highest_price)"></td>
+                            <td class="col-compact col-center">
+                                <template x-if="product.snap_eligible">
+                                    <span>✓</span>
+                                </template>
+                                <template x-if="!product.snap_eligible">
+                                    <span>✗</span>
+                                </template>
+                            </td>
+                            <td class="col-compact col-center">
+                                <template x-if="product.available">
+                                    <span>✓</span>
+                                </template>
+                                <template x-if="!product.available">
+                                    <span>✗</span>
+                                </template>
+                            </td>
+                            <td class="col-compact" x-text="product.last_updated"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+
+            <p>
+                <button @click="previousPage" :disabled="offset === 0">Previous</button>
+                <span>Page <span x-text="currentPage"></span></span>
+                <button @click="nextPage" :disabled="products.length < limit">Next</button>
+            </p>
+        </div>
+
+        <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data('priceTracker', () => ({
+                    query: '',
+                    snapFilter: '',
+                    storeFilter: '',
+                    categoryFilter: '',
+                    storeList: [],
+                    categories: {{ categories|tojson }},
+                    products: [],
+                    loading: false,
+                    offset: 0,
+                    limit: 20,
+
+                    get currentPage() {
+                        return Math.floor(this.offset / this.limit) + 1;
+                    },
+
+                    searchProducts() {
+                        this.loading = true;
+                        this.offset = 0;
+                        this.fetchProducts();
+                    },
+
+                    fetchProducts() {
+                        const oldProducts = [...this.products];
+                        this.loading = true;
+
+                        let url = `/api/products?q=${encodeURIComponent(this.query)}&limit=${this.limit}&offset=${this.offset}`;
+
+                        if (this.snapFilter !== '') {
+                            url += `&snap=${this.snapFilter}`;
+                        }
+
+                        if (this.storeFilter !== '') {
+                            url += `&store=${encodeURIComponent(this.storeFilter)}`;
+                        }
+
+                        if (this.categoryFilter !== '') {
+                            url += `&category=${encodeURIComponent(this.categoryFilter)}`;
+                        }
+
+                        fetch(url)
+                            .then(response => response.json())
+                            .then(data => {
+                                this.products = data;
+                                this.loading = false;
+
+                                // Update store list if empty
+                                if (this.storeList.length === 0) {
+                                    this.fetchStoreList();
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error fetching products:', error);
+                                this.loading = false;
+                                this.products = oldProducts;
+                            });
+                    },
+
+                    fetchStoreList() {
+                        fetch('/api/products?limit=1000')
+                            .then(response => response.json())
+                            .then(data => {
+                                // Extract unique store names
+                                const stores = [...new Set(data.map(product => product.store))].sort();
+                                this.storeList = stores;
+                            })
+                            .catch(error => {
+                                console.error('Error fetching store list:', error);
+                            });
+                    },
+
+                    previousPage() {
+                        if (this.offset >= this.limit) {
+                            this.offset -= this.limit;
+                            this.fetchProducts();
+                        }
+                    },
+
+                    nextPage() {
+                        if (this.products.length === this.limit) {
+                            this.offset += this.limit;
+                            this.fetchProducts();
+                        }
+                    },
+
+                    formatPrice(lowest, highest) {
+                        if (!lowest) return 'N/A';
+
+                        lowest = parseFloat(lowest);
+                        highest = parseFloat(highest);
+
+                        if (lowest === highest) {
+                            return '$' + lowest.toFixed(2);
+                        } else {
+                            return '$' + lowest.toFixed(2) + ' - $' + highest.toFixed(2);
+                        }
+                    }
+                }));
+            });
+        </script>
+    </main>
+{% endblock %}

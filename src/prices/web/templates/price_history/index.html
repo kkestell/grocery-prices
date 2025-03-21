@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Price History{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+<style>
+    #priceChart {
+        height: 300px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="priceHistoryTracker" x-init="fetchPriceHistory()">
+    <main>
+        <header>
+            <h1><span x-text="product.name || 'Loading...'"></span></h1>
+        </header>
+
+        <h2>Product Details</h2>
+
+        <dl>
+            <dt>Store</dt>
+            <dd x-text="product.store"></dd>
+            <dt>SKU</dt>
+            <dd x-text="product.sku"></dd>
+            <dt>Size</dt>
+            <dd x-text="product.size"></dd>
+            <dt>Unit</dt>
+            <dd x-text="product.unit"></dd>
+            <dt>Brand</dt>
+            <dd x-text="product.brand"></dd>
+            <dt>Category</dt>
+            <dd x-text="product.category"></dd>
+        </dl>
+
+        <div x-show="!loading && !error">
+            <h2>Price History</h2>
+            <canvas id="priceChart"></canvas>
+        </div>
+
+        <div x-show="currentPrices.length > 0">
+            <h2>Current Prices by Location</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Store</th>
+                        <th>Location</th>
+                        <th>Price</th>
+                        <th>Availability</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="price in currentPrices" :key="price.location">
+                        <tr>
+                            <td x-text="price.store"></td>
+                            <td x-text="price.location"></td>
+                            <td x-text="'$' + price.price.toFixed(2)"></td>
+                            <td x-text="price.available ? 'In Stock' : 'Out of Stock'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <div x-show="loading" class="loading">
+            Loading price history...
+        </div>
+
+        <div x-show="error" class="error">
+            <p x-text="errorMessage"></p>
+        </div>
+    </main>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('priceHistoryTracker', () => ({
+        product: {},
+        priceHistory: [],
+        currentPrices: [],
+        chart: null,
+        loading: true,
+        error: false,
+        errorMessage: '',
+
+        fetchPriceHistory() {
+            const store = "{{ store }}";
+            const sku = "{{ sku }}";
+
+            fetch(`/api/price-history/${store}/${sku}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load price history');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.product = data.product;
+                    this.priceHistory = data.price_history;
+
+                    // Process current prices (latest date)
+                    if (this.priceHistory.length > 0) {
+                        // Get the prices from the most recent date and sort by price
+                        this.currentPrices = [...this.priceHistory[0].prices]
+                            .sort((a, b) => a.price - b.price);
+                    }
+
+                    this.loading = false;
+
+                    // Initialize chart after data is loaded
+                    this.$nextTick(() => {
+                        this.initializeChart();
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading price history:', error);
+                    this.loading = false;
+                    this.error = true;
+                    this.errorMessage = 'Error loading product data';
+                });
+        },
+
+        initializeChart() {
+            if (!this.priceHistory.length) return;
+
+            // Convert dates to proper Date objects for the chart
+            const chartData = {
+                datasets: [{
+                    label: 'Average Price',
+                    data: this.priceHistory.map(item => ({
+                        x: new Date(item.date),
+                        y: item.avg_price,
+                        min: item.min_price,
+                        max: item.max_price
+                    })),
+                    borderColor: 'blue',
+                    fill: false,
+                    tension: 0.1
+                }]
+            };
+
+            // Create error bars data for min/max prices
+            const errorBars = [];
+
+            // Add vertical lines for each data point
+            this.priceHistory.forEach((item) => {
+                const date = new Date(item.date);
+
+                // Vertical line
+                errorBars.push({
+                    type: 'line',
+                    xMin: date,
+                    xMax: date,
+                    yMin: item.min_price,
+                    yMax: item.max_price,
+                    borderColor: 'rgba(255, 0, 0, 0.7)',
+                    borderWidth: 2
+                });
+
+                // Top horizontal cap
+                errorBars.push({
+                    type: 'line',
+                    xMin: new Date(date.getTime() - 86400000 * 0.2), // 0.2 days before
+                    xMax: new Date(date.getTime() + 86400000 * 0.2), // 0.2 days after
+                    yMin: item.max_price,
+                    yMax: item.max_price,
+                    borderColor: 'rgba(255, 0, 0, 0.7)',
+                    borderWidth: 2
+                });
+
+                // Bottom horizontal cap
+                errorBars.push({
+                    type: 'line',
+                    xMin: new Date(date.getTime() - 86400000 * 0.2), // 0.2 days before
+                    xMax: new Date(date.getTime() + 86400000 * 0.2), // 0.2 days after
+                    yMin: item.min_price,
+                    yMax: item.min_price,
+                    borderColor: 'rgba(255, 0, 0, 0.7)',
+                    borderWidth: 2
+                });
+            });
+
+            // Create chart
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    animation: false,
+                    maintainAspectRatio: false,
+                    color: 'black',
+                    font: {
+                        family: 'system-ui, sans-serif',
+                        size: 14,
+                        color: 'black'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(2);
+                                },
+                                font: {
+                                    family: 'system-ui, sans-serif',
+                                    size: 14,
+                                    color: 'black'
+                                },
+                                color: 'black'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Price ($)',
+                                font: {
+                                    family: 'system-ui, sans-serif',
+                                    size: 14,
+                                    color: 'black'
+                                },
+                                color: 'black'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day'
+                            },
+                            ticks: {
+                                font: {
+                                    family: 'system-ui, sans-serif',
+                                    size: 14,
+                                    color: 'black'
+                                },
+                                color: 'black'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Date',
+                                font: {
+                                    family: 'system-ui, sans-serif',
+                                    size: 14,
+                                    color: 'black'
+                                },
+                                color: 'black'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                font: {
+                                    family: 'system-ui, sans-serif',
+                                    size: 14,
+                                    color: 'black'
+                                },
+                                color: 'black'
+                            }
+                        },
+                        tooltip: {
+                            titleFont: {
+                                family: 'system-ui, sans-serif',
+                                size: 14
+                            },
+                            bodyFont: {
+                                family: 'system-ui, sans-serif',
+                                size: 14
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    const point = context.raw;
+                                    return [
+                                        `Average: $${point.y.toFixed(2)}`,
+                                        `Min: $${point.min.toFixed(2)}`,
+                                        `Max: $${point.max.toFixed(2)}`
+                                    ];
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: errorBars
+                        }
+                    }
+                }
+            });
+        }
+    }));
+});
+</script>
+{% endblock %}

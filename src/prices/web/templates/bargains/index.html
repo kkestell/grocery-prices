@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Bargains{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
+<style>
+    th:not(:nth-child(6)), td:not(:nth-child(6)) {
+        white-space: nowrap;
+        width: 1px;
+    }
+    th:nth-child(6), td:nth-child(6) {
+        width: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <main>
+        <header>
+            <h1>Bargains</h1>
+        </header>
+        <div x-data="bargainsTracker" x-init="fetchBargains()">
+            <table border class="wide">
+                <thead>
+                    <tr>
+                        <th>Store</th>
+                        <th>Locations</th>
+                        <th>Category</th>
+                        <th>SKU</th>
+                        <th>Brand</th>
+                        <th>Product Name</th>
+                        <th>Size</th>
+                        <th>Avg Price</th>
+                        <th>Current Price</th>
+                        <th>Discount %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading && bargains.length === 0">
+                        <tr>
+                            <td colspan="9">Loading...</td>
+                        </tr>
+                    </template>
+
+                    <template x-if="!loading && bargains.length === 0">
+                        <tr>
+                            <td colspan="9">No bargains found</td>
+                        </tr>
+                    </template>
+
+                    <template x-for="bargain in bargains" :key="bargain.bargain_id">
+                        <tr>
+                            <td x-text="bargain.store"></td>
+                            <td x-text="bargain.locations"></td>
+                            <td x-text="bargain.category"></td>
+                            <td>
+                                <a :href="`/price-history/${bargain.store}/${bargain.sku}`" x-text="bargain.sku"></a>
+                            </td>                        <td x-text="bargain.brand || ''"></td>
+                            <td x-text="bargain.name"></td>
+                            <td x-text="bargain.size || ''"></td>
+                            <td x-text="'$' + bargain.avg_price.toFixed(2)"></td>
+                            <td x-text="'$' + bargain.current_price.toFixed(2)"></td>
+                            <td x-text="Math.round(bargain.discount_percentage) + '%'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+
+            <p>
+                <button @click="previousPage" :disabled="offset === 0">Previous</button>
+                <span>Page <span x-text="currentPage"></span></span>
+                <button @click="nextPage" :disabled="bargains.length < limit">Next</button>
+            </p>
+        </div>
+
+        <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data('bargainsTracker', () => ({
+                    bargains: [],
+                    loading: false,
+                    offset: 0,
+                    limit: 25,
+
+                    get currentPage() {
+                        return Math.floor(this.offset / this.limit) + 1;
+                    },
+
+                    fetchBargains() {
+                        const oldBargains = [...this.bargains];
+                        this.loading = true;
+
+                        fetch(`/api/bargains?limit=${this.limit}&offset=${this.offset}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                this.bargains = data;
+                                this.loading = false;
+                            })
+                            .catch(error => {
+                                console.error('Error fetching bargains:', error);
+                                this.loading = false;
+                                this.bargains = oldBargains;
+                            });
+                    },
+
+                    previousPage() {
+                        if (this.offset >= this.limit) {
+                            this.offset -= this.limit;
+                            this.fetchBargains();
+                        }
+                    },
+
+                    nextPage() {
+                        if (this.bargains.length === this.limit) {
+                            this.offset += this.limit;
+                            this.fetchBargains();
+                        }
+                    }
+                }));
+            });
+        </script>
+    </main>
+{% endblock %}

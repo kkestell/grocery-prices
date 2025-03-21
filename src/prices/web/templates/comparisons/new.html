@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+
+{% block title %}Compare Products{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
+<style>
+    /* Column styles for the products table */
+    .col-store, .col-category, .col-sku, .col-brand,
+    .col-size, .col-unit, .col-price, .col-snap,
+    .col-available, .col-action {
+        white-space: nowrap;
+        width: 1px;
+    }
+    .col-name {
+        width: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+    .col-snap, .col-available {
+        text-align: center;
+    }
+
+    /* Column styles for the comparison list table */
+    .comparison-table .col-comp-store, .comparison-table .col-comp-brand,
+    .comparison-table .col-comp-size, .comparison-table .col-comp-unit,
+    .comparison-table .col-comp-price, .comparison-table .col-comp-action {
+        white-space: nowrap;
+        width: 1px;
+    }
+    .comparison-table .col-comp-name {
+        width: auto;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main>
+    <header>
+        <h1>Compare Prices</h1>
+    </header>
+
+    <div x-data="productCompare" x-init="fetchProducts()">
+        <div>
+            <p>
+                <input type="text" x-model="query" placeholder="Search by SKU, product name, or brand" @keyup.enter="searchProducts">
+                <label for="store-filter">Store:</label>
+                <select id="store-filter" x-model="storeFilter" @change="searchProducts">
+                    <option value="">Any</option>
+                    <template x-for="store in storeList">
+                        <option :value="store" x-text="store"></option>
+                    </template>
+                </select>
+                <label for="category-filter">Category:</label>
+                <select id="category-filter" x-model="categoryFilter" @change="searchProducts">
+                    <option value="">Any</option>
+                    <template x-for="category in categories">
+                        <option :value="category" x-text="category"></option>
+                    </template>
+                </select>
+                <button @click="searchProducts">Search</button>
+            </p>
+
+            <table class="wide" border>
+                <thead>
+                    <tr>
+                        <th class="col-store">Store</th>
+                        <th class="col-category">Category</th>
+                        <th class="col-brand">Brand</th>
+                        <th class="col-name">Product Name</th>
+                        <th class="col-size">Size</th>
+                        <th class="col-unit">Unit</th>
+                        <th class="col-price">Price</th>
+                        <th class="col-available">Available</th>
+                        <th class="col-action">Add</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading && products.length === 0">
+                        <tr>
+                            <td colspan="11">Loading...</td>
+                        </tr>
+                    </template>
+
+                    <template x-if="!loading && products.length === 0">
+                        <tr>
+                            <td colspan="11">No results found</td>
+                        </tr>
+                    </template>
+
+                    <template x-for="product in products" :key="product.store + product.sku">
+                        <tr>
+                            <td class="col-store" x-text="product.store"></td>
+                            <td class="col-category" x-text="product.category"></td>
+                            <td class="col-brand" x-text="product.brand || ''"></td>
+                            <td class="col-name"><a :href="`/price-history/${product.store}/${product.sku}`" x-text="product.name"></a></td>
+                            <td class="col-size" x-text="product.size || ''"></td>
+                            <td class="col-unit" x-text="product.unit || ''"></td>
+                            <td class="col-price" x-text="formatPrice(product.lowest_price, product.highest_price)"></td>
+                            <td class="col-available">
+                                <template x-if="product.available">
+                                    <span>✓</span>
+                                </template>
+                                <template x-if="!product.available">
+                                    <span>✗</span>
+                                </template>
+                            </td>
+                            <td class="col-action">
+                                <button
+                                    @click="addToCompare(product)"
+                                    :disabled="isProductInCompareList(product)"
+                                    :title="compareUnit && product.unit.toLowerCase() !== compareUnit ?
+                                           'Cannot mix products with different units' : ''"
+                                >Add</button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+
+            <p>
+                <button @click="previousPage" :disabled="offset === 0">Previous</button>
+                <span>Page <span x-text="currentPage"></span></span>
+                <button @click="nextPage" :disabled="products.length < limit">Next</button>
+            </p>
+        </div>
+
+        <div>
+            <h2>Comparison List</h2>
+            <template x-if="compareUnit">
+                <p>Current comparison unit: <strong x-text="compareUnit"></strong> (only products with this unit can be added)</p>
+            </template>
+
+            <template x-if="compareList.length === 0">
+                <p>No products added to comparison yet.</p>
+            </template>
+
+            <template x-if="compareList.length > 0">
+                <div>
+                    <table border class="wide comparison-table">
+                        <thead>
+                            <tr>
+                                <th class="col-comp-store">Store</th>
+                                <th class="col-comp-brand">Brand</th>
+                                <th class="col-comp-name">Product Name</th>
+                                <th class="col-comp-size">Size</th>
+                                <th class="col-comp-unit">Unit</th>
+                                <th class="col-comp-price">Price</th>
+                                <th class="col-comp-action">Remove</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(product, index) in compareList" :key="product.store + product.sku">
+                                <tr>
+                                    <td class="col-comp-store" x-text="product.store"></td>
+                                    <td class="col-comp-brand" x-text="product.brand || ''"></td>
+                                    <td class="col-comp-name" x-text="product.name"></td>
+                                    <td class="col-comp-size" x-text="product.size || ''"></td>
+                                    <td class="col-comp-unit" x-text="product.unit || ''"></td>
+                                    <td class="col-comp-price" x-text="formatPrice(product.lowest_price, product.highest_price)"></td>
+                                    <td class="col-comp-action">
+                                        <button @click="removeFromCompare(index)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+
+                    <div>
+                        <label for="comparison-title">Comparison Title:</label>
+                        <input type="text" id="comparison-title" x-model="comparisonTitle" placeholder="Enter a title for this comparison">
+                        <button @click="saveComparison" :disabled="!canSaveComparison">Create Comparison</button>
+                        <span x-show="savingComparison">Saving...</span>
+                        <span x-show="saveError" style="color: red;" x-text="saveError"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('productCompare', () => ({
+                query: '',
+                storeFilter: '',
+                categoryFilter: '',
+                storeList: [],
+                categories: {{ categories|tojson }},
+                products: [],
+                compareList: [],
+                compareUnit: null, // Tracks the unit of products in the comparison
+                comparisonTitle: '',
+                savingComparison: false,
+                saveError: '',
+                loading: false,
+                offset: 0,
+                limit: 20,
+
+                get currentPage() {
+                    return Math.floor(this.offset / this.limit) + 1;
+                },
+
+                get canSaveComparison() {
+                    return this.compareList.length > 0 &&
+                           this.comparisonTitle.trim() !== '' &&
+                           !this.savingComparison;
+                },
+
+                searchProducts() {
+                    this.loading = true;
+                    this.offset = 0;
+                    this.fetchProducts();
+                },
+
+                fetchProducts() {
+                    const oldProducts = [...this.products];
+                    this.loading = true;
+
+                    let url = `/api/products?q=${encodeURIComponent(this.query)}&limit=${this.limit}&offset=${this.offset}`;
+
+                    if (this.storeFilter !== '') {
+                        url += `&store=${encodeURIComponent(this.storeFilter)}`;
+                    }
+
+                    if (this.categoryFilter !== '') {
+                        url += `&category=${encodeURIComponent(this.categoryFilter)}`;
+                    }
+
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(data => {
+                            this.products = data;
+                            this.loading = false;
+
+                            // Update store list if empty
+                            if (this.storeList.length === 0) {
+                                this.fetchStoreList();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching products:', error);
+                            this.loading = false;
+                            this.products = oldProducts;
+                        });
+                },
+
+                fetchStoreList() {
+                    fetch('/api/products?limit=1000')
+                        .then(response => response.json())
+                        .then(data => {
+                            // Extract unique store names
+                            const stores = [...new Set(data.map(product => product.store))].sort();
+                            this.storeList = stores;
+                        })
+                        .catch(error => {
+                            console.error('Error fetching store list:', error);
+                        });
+                },
+
+                previousPage() {
+                    if (this.offset >= this.limit) {
+                        this.offset -= this.limit;
+                        this.fetchProducts();
+                    }
+                },
+
+                nextPage() {
+                    if (this.products.length === this.limit) {
+                        this.offset += this.limit;
+                        this.fetchProducts();
+                    }
+                },
+
+                formatPrice(lowest, highest) {
+                    if (!lowest) return 'N/A';
+
+                    lowest = parseFloat(lowest);
+                    highest = parseFloat(highest);
+
+                    if (lowest === highest) {
+                        return '$' + lowest.toFixed(2);
+                    } else {
+                        return '$' + lowest.toFixed(2) + ' - $' + highest.toFixed(2);
+                    }
+                },
+
+                addToCompare(product) {
+                    if (this.compareList.length === 0) {
+                        // Set the unit to compare when adding the first product
+                        this.compareUnit = product.unit.toLowerCase();
+                    }
+
+                    if (!this.isProductInCompareList(product)) {
+                        this.compareList.push(product);
+                    }
+                },
+
+                removeFromCompare(index) {
+                    this.compareList.splice(index, 1);
+
+                    // Reset the comparison unit if we removed all products
+                    if (this.compareList.length === 0) {
+                        this.compareUnit = null;
+                    }
+                },
+
+                isProductInCompareList(product) {
+                    // Check if already in the list
+                    const alreadyAdded = this.compareList.some(p =>
+                        p.store === product.store && p.sku === product.sku
+                    );
+
+                    // Check unit compatibility
+                    const unitIncompatible = this.compareList.length > 0 &&
+                                             this.compareUnit !== product.unit.toLowerCase();
+
+                    return alreadyAdded || unitIncompatible;
+                },
+
+                saveComparison() {
+                    if (!this.canSaveComparison) return;
+
+                    this.savingComparison = true;
+                    this.saveError = '';
+
+                    // Extract product IDs from the compare list
+                    const productIds = this.compareList.map(product => product.id);
+
+                    fetch('/api/comparisons', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            title: this.comparisonTitle,
+                            product_ids: productIds
+                        }),
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to save comparison');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Redirect to the comparisons list page
+                        window.location.href = '/comparisons';
+                    })
+                    .catch(error => {
+                        console.error('Error saving comparison:', error);
+                        this.saveError = error.message || 'Failed to save comparison';
+                        this.savingComparison = false;
+                    });
+                }
+            }));
+        });
+    </script>
+</main>
+{% endblock %}

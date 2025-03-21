@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main>
+    <p>Tracking {{ stats.get('total_products', '0') }} products at {{ stats.get('total_locations', '0') }} locations from {{ stats.get('total_stores', '0') }} different stores.</p>
+</main>
+{% endblock %}
